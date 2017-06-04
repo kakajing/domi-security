@@ -5,9 +5,7 @@ import com.domi.entity.SysUserEntity;
 import com.domi.service.SysMenuService;
 import com.domi.service.SysUserService;
 import org.apache.commons.lang.StringUtils;
-import org.apache.shiro.authc.AuthenticationException;
-import org.apache.shiro.authc.AuthenticationInfo;
-import org.apache.shiro.authc.AuthenticationToken;
+import org.apache.shiro.authc.*;
 import org.apache.shiro.authz.AuthorizationInfo;
 import org.apache.shiro.authz.SimpleAuthorizationInfo;
 import org.apache.shiro.realm.AuthorizingRealm;
@@ -30,6 +28,12 @@ public class UserRealm extends AuthorizingRealm {
     @Autowired
     private SysMenuService sysMenuService;
 
+    /**
+     * 授权(验证权限时调用)
+     *
+     * @param principalCollection
+     * @return
+     */
     @Override
     protected AuthorizationInfo doGetAuthorizationInfo(PrincipalCollection principalCollection) {
         SysUserEntity user = (SysUserEntity) principalCollection.getPrimaryPrincipal();
@@ -75,8 +79,38 @@ public class UserRealm extends AuthorizingRealm {
         return info;
     }
 
+    /**
+     * 认证(登录时调用)
+     *
+     * @param authenticationToken
+     * @return
+     * @throws AuthenticationException
+     */
     @Override
-    protected AuthenticationInfo doGetAuthenticationInfo(AuthenticationToken authenticationToken) throws AuthenticationException {
-        return null;
+    protected AuthenticationInfo doGetAuthenticationInfo(AuthenticationToken authenticationToken)
+            throws AuthenticationException {
+
+        String username = (String) authenticationToken.getPrincipal();
+        String password = new String((char[]) authenticationToken.getCredentials());
+
+        //查询用户信息
+        SysUserEntity user = sysUserService.queryByUserName(username);
+
+        //账号不存在
+        if (user == null){
+            throw new UnknownAccountException("账号或密码不正确");
+        }
+
+        //密码错误
+        if (!password.equals(user.getPassword())){
+            throw new IncorrectCredentialsException("账号或密码不正确");
+        }
+
+        if (user.getStatus() == 0){
+            throw new LockedAccountException("账号已被锁定,请联系管理员");
+        }
+
+        return new SimpleAuthenticationInfo(user, password, getName());
+
     }
 }
